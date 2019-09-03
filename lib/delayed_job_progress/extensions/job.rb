@@ -7,7 +7,6 @@ Delayed::Backend::ActiveRecord::Job.class_eval do
     where_sql = <<-SQL.strip_heredoc
       (run_at <= ? AND (locked_at IS NULL OR locked_at < ?) OR locked_by = ?)
       AND failed_at IS NULL
-      AND completed_at IS NULL
     SQL
     where(where_sql, db_time_now, db_time_now - max_run_time, worker_name)
   end
@@ -46,25 +45,6 @@ Delayed::Backend::ActiveRecord::Job.class_eval do
     if self.respond_to?(:last_error=)
       self.error_message ||= error.message
       self.last_error = "#{error.message}\n#{error.backtrace.join("\n")}"
-    end
-  end
-
-  def destroy_completed_jobs?
-    payload_object.respond_to?(:destroy_completed_jobs?) ?
-      payload_object.destroy_completed_jobs? :
-      Delayed::Worker.destroy_completed_jobs
-  end
-
-  def destroy(force_destroy = false)
-    if destroy_completed_jobs? || force_destroy
-      super()
-    else
-      update_columns(
-        completed_at:     Time.zone.now,
-        progress_current: self.progress_max,
-        locked_at:        nil,
-        locked_by:        nil
-      )
     end
   end
 end
